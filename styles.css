@@ -223,6 +223,15 @@ body {
   line-height: 1.35;
 }
 
+.article-title a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.article-title a:hover {
+  text-decoration: underline;
+}
+
 .article-summary {
   font-size: 13px;
   color: var(--color-text-muted);

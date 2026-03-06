@@ -125,6 +125,7 @@ function parseRow(row) {
   return {
     post_id:    String(getCol(row, 'post_id')),
     title:      String(getCol(row, 'title')),
+    clean_url:  String(getCol(row, 'clean_url')),
     summary:    String(getCol(row, 'summary')),
     categories: unionWithOrigin(getCol(row, 'categories1'), getCol(row, 'categories2')),
     topics:     unionWithOrigin(getCol(row, 'topics1'),     getCol(row, 'topics2')),
@@ -157,7 +158,20 @@ function renderCard(row, idx) {
   card.dataset.idx = idx;
 
   card.querySelector('.post-id').textContent = `ID: ${row.post_id}`;
-  card.querySelector('.article-title').textContent = row.title;
+
+  const titleEl = card.querySelector('.article-title');
+  if (row.clean_url) {
+    const link = document.createElement('a');
+    link.href = row.clean_url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = row.title;
+    titleEl.textContent = '';
+    titleEl.appendChild(link);
+  } else {
+    titleEl.textContent = row.title;
+  }
+
   card.querySelector('.article-summary').textContent = row.summary;
 
   renderChipSection(card, 'categories', row.categories, idx);
