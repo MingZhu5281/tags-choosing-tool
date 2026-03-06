@@ -456,8 +456,27 @@ body {
   color: var(--color-text-muted);
 }
 
-.btn-restart {
+.btn-back-review {
   margin-top: 20px;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--color-primary);
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-back-review:hover {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.btn-restart {
+  margin-top: 10px;
   padding: 10px 20px;
   border-radius: var(--radius-sm);
   border: 1.5px solid var(--color-border);

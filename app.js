@@ -377,6 +377,13 @@ function buildReport() {
   return lines.join('\r\n');
 }
 
+// ── Back to review ────────────────────────────────────────────────
+document.getElementById('btn-back-review').addEventListener('click', () => {
+  downloadScreen.classList.remove('visible');
+  progressBar.classList.add('visible');
+  reviewScreen.classList.add('visible');
+});
+
 // ── Restart ───────────────────────────────────────────────────────
 document.getElementById('btn-restart').addEventListener('click', () => {
   downloadScreen.classList.remove('visible');
