@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tag Review Tool</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ── Sticky progress bar ──────────────────────────── -->
+  <div id="progress-bar">
+    <span class="progress-label" id="progress-label">0 / 0 reviewed</span>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+    <button class="btn-submit-top" id="btn-submit-top">Submit &amp; Download</button>
+  </div>
+
+  <!-- ── Upload screen ────────────────────────────────── -->
+  <div id="upload-screen">
+    <div class="upload-card">
+      <h1>Tag Review Tool</h1>
+      <p>Upload a spreadsheet to compare two versions of article tags and select the best ones.</p>
+
+      <div class="drop-zone" id="drop-zone">
+        <input type="file" id="file-input" accept=".xlsx,.csv" />
+        <span class="drop-icon">📂</span>
+        <p><strong>Click to browse</strong> or drag &amp; drop</p>
+        <p style="margin-top:6px;font-size:12px;">Supports .xlsx and .csv</p>
+      </div>
+
+      <p class="upload-hint">
+        Required columns: <code>post_id</code>, <code>title</code>, <code>summary</code>,
+        <code>categories1</code>, <code>categories2</code>, <code>topics1</code>,
+        <code>topics2</code>, <code>tags1</code>, <code>tags2</code>
+      </p>
+
+      <div id="upload-error" style="display:none;margin-top:14px;padding:10px 14px;background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;font-size:13px;color:#dc2626;"></div>
+    </div>
+  </div>
+
+  <!-- ── Review screen ────────────────────────────────── -->
+  <div id="review-screen">
+    <div id="cards-container"></div>
+  </div>
+
+  <!-- ── Download screen ──────────────────────────────── -->
+  <div id="download-screen">
+    <div class="download-card">
+      <h2>✅ Review complete!</h2>
+      <p>Your selections have been saved. Download your results below.</p>
+      <div class="download-buttons">
+        <button class="btn-download" id="btn-download-table">
+          <span class="btn-download-icon">📊</span>
+          <span class="btn-download-text">
+            <strong>Labeled Table</strong>
+            <span>CSV with categories_chosen, topics_chosen, tags_chosen columns</span>
+          </span>
+        </button>
+        <button class="btn-download" id="btn-download-report">
+          <span class="btn-download-icon">📋</span>
+          <span class="btn-download-text">
+            <strong>Version Report</strong>
+            <span>CSV showing which version (V1 vs V2) was chosen more often</span>
+          </span>
+        </button>
+      </div>
+      <button class="btn-restart" id="btn-restart">↩ Start over with a new file</button>
+    </div>
+  </div>
+
+  <!-- Article card template (hidden) -->
+  <template id="card-template">
+    <div class="article-card" data-idx="">
+      <div class="card-header">
+        <div class="post-id"></div>
+        <div class="article-title"></div>
+        <div class="article-summary"></div>
+      </div>
+      <hr class="card-divider" />
+      <div class="chip-section" data-field="categories">
+        <div class="chip-section-label">🗂 Categories</div>
+        <div class="chips-row"></div>
+      </div>
+      <div class="chip-section" data-field="topics">
+        <div class="chip-section-label">🏷 Topics</div>
+        <div class="chips-row"></div>
+      </div>
+      <div class="chip-section" data-field="tags">
+        <div class="chip-section-label">🔖 Tags</div>
+        <div class="chips-row"></div>
+      </div>
+      <div class="card-footer">
+        <textarea class="comment-textarea" placeholder="Optional comment…" rows="2"></textarea>
+        <div class="card-actions">
+          <div class="reviewed-badge">✔ Reviewed</div>
+          <div style="display:flex;gap:8px;margin-left:auto;">
+            <button class="btn-mark">Mark as reviewed</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
