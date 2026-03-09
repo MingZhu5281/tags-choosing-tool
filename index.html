@@ -61,6 +61,21 @@
         <div id="taxonomy-error" class="upload-error-box" style="display:none;"></div>
       </div>
 
+      <div class="taxonomy-upload-section">
+        <h3>Optional: Upload Tag Set File</h3>
+        <p class="taxonomy-upload-desc">Upload a file with a <code>tag</code> column to enable adding tags on review cards.</p>
+
+        <div class="drop-zone drop-zone-sm" id="tagset-drop-zone">
+          <input type="file" id="tagset-file-input" accept=".xlsx,.csv" />
+          <span class="drop-icon">🏷</span>
+          <p><strong>Click to browse</strong> or drag &amp; drop tag set file</p>
+          <p style="margin-top:6px;font-size:12px;">Supports .xlsx and .csv</p>
+        </div>
+
+        <div id="tagset-status" class="taxonomy-status-success" style="display:none;"></div>
+        <div id="tagset-error" class="upload-error-box" style="display:none;"></div>
+      </div>
+
       <button class="btn-next" id="btn-next-review">Next: Start Review &rarr;</button>
     </div>
   </div>

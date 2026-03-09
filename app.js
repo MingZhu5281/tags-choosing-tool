@@ -9,7 +9,8 @@ const state = {
   selections: {}, // { idx: { categories: Set<string>, topics: Set<string>, tags: Set<string>, comment: "" } }
   reviewed: new Set(),
   taxonomy: null,      // null or { "Category Name": ["Topic A", "Topic B", ...] }
-  taxonomyAdded: {},   // { idx: { categories: Set<key>, topics: Set<key> } }
+  tagSet: null,        // null or ["Tag A", "Tag B", ...] (flat deduplicated list)
+  taxonomyAdded: {},   // { idx: { categories: Set<key>, topics: Set<key>, tags: Set<key> } }
 };
 
 // ── DOM refs ─────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ function handleFile(file) {
           tags: new Set(),
           comment: '',
         };
-        state.taxonomyAdded[idx] = { categories: new Set(), topics: new Set() };
+        state.taxonomyAdded[idx] = { categories: new Set(), topics: new Set(), tags: new Set() };
       });
       showStep2();
     } catch (err) {
@@ -187,6 +188,79 @@ function buildTaxonomyHierarchy(rows) {
 btnNextReview.addEventListener('click', () => {
   showReviewScreen();
 });
+
+// ── Step 2b: tag set upload ─────────────────────────────────────
+const tagsetDropZone  = document.getElementById('tagset-drop-zone');
+const tagsetFileInput = document.getElementById('tagset-file-input');
+const tagsetStatus    = document.getElementById('tagset-status');
+const tagsetError     = document.getElementById('tagset-error');
+
+tagsetFileInput.addEventListener('change', (e) => {
+  if (e.target.files[0]) handleTagSetFile(e.target.files[0]);
+});
+
+tagsetDropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  tagsetDropZone.classList.add('drag-over');
+});
+
+tagsetDropZone.addEventListener('dragleave', () => tagsetDropZone.classList.remove('drag-over'));
+
+tagsetDropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  tagsetDropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleTagSetFile(e.dataTransfer.files[0]);
+});
+
+function handleTagSetFile(file) {
+  tagsetError.style.display = 'none';
+  tagsetStatus.style.display = 'none';
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      if (!rows.length) throw new Error('Tag set file is empty.');
+      validateTagSetColumns(rows[0]);
+      state.tagSet = buildTagSet(rows);
+
+      tagsetStatus.textContent = `✔ Tag set loaded: ${state.tagSet.length} tags.`;
+      tagsetStatus.style.display = 'block';
+    } catch (err) {
+      tagsetError.textContent = err.message;
+      tagsetError.style.display = 'block';
+      state.tagSet = null;
+    }
+  };
+  reader.onerror = () => {
+    tagsetError.textContent = 'Failed to read tag set file.';
+    tagsetError.style.display = 'block';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function validateTagSetColumns(row) {
+  const cols = Object.keys(row).map(k => k.trim().toLowerCase());
+  if (!cols.includes('tag')) throw new Error('Tag set file must have a "tag" column.');
+}
+
+function buildTagSet(rows) {
+  const seen = new Set();
+  const tags = [];
+  rows.forEach(row => {
+    const tag = String(getCol(row, 'tag')).trim();
+    if (!tag) return;
+    const key = normalizeKey(tag);
+    if (!seen.has(key)) {
+      seen.add(key);
+      tags.push(tag);
+    }
+  });
+  return tags;
+}
 
 // ── Row parsing ──────────────────────────────────────────────────
 function splitField(val) {
@@ -314,8 +388,14 @@ function renderChipSection(card, field, items, idx) {
   renderChipSectionContent(chipsRow, field, items, idx);
 }
 
+function hasAddSupport(field) {
+  if ((field === 'categories' || field === 'topics') && state.taxonomy) return true;
+  if (field === 'tags' && state.tagSet) return true;
+  return false;
+}
+
 function renderChipSectionContent(chipsRow, field, items, idx) {
-  if (!items.length && !(state.taxonomy && (field === 'categories' || field === 'topics'))) {
+  if (!items.length && !hasAddSupport(field)) {
     chipsRow.innerHTML = '<span class="chip-empty">None</span>';
     return;
   }
@@ -358,6 +438,19 @@ function renderChipSectionContent(chipsRow, field, items, idx) {
     addBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       openTaxonomyDropdown(addBtn, field, idx);
+    });
+    chipsRow.appendChild(addBtn);
+  }
+
+  // "+ Add" button for tags when tag set is loaded
+  if (state.tagSet && field === 'tags') {
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-taxonomy-add';
+    addBtn.type = 'button';
+    addBtn.textContent = '+ Add';
+    addBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openTagDropdown(addBtn, idx);
     });
     chipsRow.appendChild(addBtn);
   }
@@ -499,6 +592,83 @@ function addTaxonomyTopic(idx, topicName, parentCategory) {
   rerenderCardChips(idx);
 }
 
+// ── Tag set dropdown + add helper ───────────────────────────────
+function openTagDropdown(anchorBtn, idx) {
+  closeTaxonomyDropdown();
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'taxonomy-dropdown';
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'taxonomy-search';
+  searchInput.placeholder = 'Search tags...';
+  dropdown.appendChild(searchInput);
+
+  const listEl = document.createElement('div');
+  listEl.className = 'taxonomy-list';
+  dropdown.appendChild(listEl);
+
+  function renderList(query) {
+    listEl.innerHTML = '';
+    const q = (query || '').trim().toLowerCase();
+
+    const filtered = state.tagSet.filter(tag => !q || normalizeKey(tag).includes(q));
+
+    filtered.forEach(tag => {
+      const row = document.createElement('div');
+      row.className = 'taxonomy-item';
+      row.textContent = tag;
+
+      const tagKey = normalizeKey(tag);
+      const alreadyHas = state.rows[idx].tags
+        .some(t => normalizeKey(t.item) === tagKey);
+      if (alreadyHas) row.classList.add('taxonomy-item-exists');
+
+      row.addEventListener('click', () => {
+        addTagFromSet(idx, tag);
+        closeTaxonomyDropdown();
+      });
+      listEl.appendChild(row);
+    });
+
+    if (!listEl.children.length) {
+      const empty = document.createElement('div');
+      empty.className = 'taxonomy-empty';
+      empty.textContent = 'No matches found.';
+      listEl.appendChild(empty);
+    }
+  }
+
+  renderList('');
+  searchInput.addEventListener('input', () => renderList(searchInput.value));
+
+  const section = anchorBtn.closest('.chip-section');
+  section.style.position = 'relative';
+  section.appendChild(dropdown);
+
+  activeTaxDropdown = dropdown;
+  searchInput.focus();
+
+  setTimeout(() => {
+    document.addEventListener('click', onDocClickCloseTax);
+  }, 0);
+}
+
+function addTagFromSet(idx, tagName) {
+  const tagKey = normalizeKey(tagName);
+  const row = state.rows[idx];
+
+  const alreadyExists = row.tags.some(t => normalizeKey(t.item) === tagKey);
+  if (!alreadyExists) {
+    row.tags.push({ item: tagName, inV1: false, inV2: false, fromTaxonomy: true });
+    state.taxonomyAdded[idx].tags.add(tagKey);
+  }
+
+  state.selections[idx].tags.add(tagKey);
+  rerenderCardChips(idx);
+}
+
 function rerenderCardChips(idx) {
   const card = document.querySelector(`.article-card[data-idx="${idx}"]`);
   if (!card) return;
@@ -614,7 +784,7 @@ function buildReport() {
   const lines = [detailHeaders.map(csvEscape).join(',')];
 
   let totalV1 = 0, totalV2 = 0, totalBoth = 0, totalTaxAdded = 0;
-  let totalCatAdded = 0, totalTopicAdded = 0;
+  let totalCatAdded = 0, totalTopicAdded = 0, totalTagAdded = 0;
 
   state.rows.forEach((row, idx) => {
     const sel = state.selections[idx];
@@ -643,6 +813,7 @@ function buildReport() {
       totalTaxAdded += taxAdded;
       if (field === 'categories') totalCatAdded += taxAdded;
       if (field === 'topics')     totalTopicAdded += taxAdded;
+      if (field === 'tags')       totalTagAdded += taxAdded;
 
       lines.push([row.post_id, row.title, field, chosen, v1Only, v2Only, both, taxAdded, skipped].map(csvEscape).join(','));
     });
@@ -658,6 +829,7 @@ function buildReport() {
   lines.push(['Shared (both) items chosen', totalBoth, ...pad.slice(2)].map(csvEscape).join(','));
   lines.push(['Taxonomy categories added', totalCatAdded, ...pad.slice(2)].map(csvEscape).join(','));
   lines.push(['Taxonomy topics added', totalTopicAdded, ...pad.slice(2)].map(csvEscape).join(','));
+  lines.push(['Tag set tags added', totalTagAdded, ...pad.slice(2)].map(csvEscape).join(','));
 
   const total = totalV1 + totalV2;
   const v1Pct = total ? ((totalV1 / total) * 100).toFixed(1) : '—';
@@ -693,12 +865,15 @@ document.getElementById('btn-restart').addEventListener('click', () => {
   uploadStep2.style.display = 'none';
   fileInput.value = '';
   taxonomyFileInput.value = '';
+  tagsetFileInput.value = '';
   cardsContainer.innerHTML = '';
   uploadError.style.display = 'none';
   taxonomyStatus.style.display = 'none';
   taxonomyError.style.display = 'none';
+  tagsetStatus.style.display = 'none';
+  tagsetError.style.display = 'none';
   closeTaxonomyDropdown();
-  Object.assign(state, { rawRows: [], rows: [], selections: {}, reviewed: new Set(), taxonomy: null, taxonomyAdded: {} });
+  Object.assign(state, { rawRows: [], rows: [], selections: {}, reviewed: new Set(), taxonomy: null, tagSet: null, taxonomyAdded: {} });
 });
 
 // ── Utilities ─────────────────────────────────────────────────────
