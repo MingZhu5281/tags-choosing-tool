@@ -19,7 +19,7 @@
 
   <!-- ── Upload screen ────────────────────────────────── -->
   <div id="upload-screen">
-    <div class="upload-card">
+    <div class="upload-card" id="upload-step1">
       <h1>Tag Review Tool</h1>
       <p>Upload a spreadsheet to compare two versions of article tags and select the best ones.</p>
 
@@ -40,6 +40,28 @@
       </p>
 
       <div id="upload-error" style="display:none;margin-top:14px;padding:10px 14px;background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;font-size:13px;color:#dc2626;"></div>
+    </div>
+
+    <div class="upload-card" id="upload-step2" style="display:none;">
+      <h2>Main file loaded</h2>
+      <p id="step2-file-info"></p>
+
+      <div class="taxonomy-upload-section">
+        <h3>Optional: Upload Taxonomy File</h3>
+        <p class="taxonomy-upload-desc">Upload a file with <code>category</code> and <code>topic</code> columns to enable adding from taxonomy on review cards.</p>
+
+        <div class="drop-zone drop-zone-sm" id="taxonomy-drop-zone">
+          <input type="file" id="taxonomy-file-input" accept=".xlsx,.csv" />
+          <span class="drop-icon">📋</span>
+          <p><strong>Click to browse</strong> or drag &amp; drop taxonomy file</p>
+          <p style="margin-top:6px;font-size:12px;">Supports .xlsx and .csv</p>
+        </div>
+
+        <div id="taxonomy-status" class="taxonomy-status-success" style="display:none;"></div>
+        <div id="taxonomy-error" class="upload-error-box" style="display:none;"></div>
+      </div>
+
+      <button class="btn-next" id="btn-next-review">Next: Start Review &rarr;</button>
     </div>
   </div>
 

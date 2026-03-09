@@ -8,6 +8,8 @@ const state = {
   rows: [],       // enriched: { ..., categories, topics, tags } each an array of {item, inV1, inV2}
   selections: {}, // { idx: { categories: Set<string>, topics: Set<string>, tags: Set<string>, comment: "" } }
   reviewed: new Set(),
+  taxonomy: null,      // null or { "Category Name": ["Topic A", "Topic B", ...] }
+  taxonomyAdded: {},   // { idx: { categories: Set<key>, topics: Set<key> } }
 };
 
 // ── DOM refs ─────────────────────────────────────────────────────
@@ -64,8 +66,9 @@ function handleFile(file) {
           tags: new Set(),
           comment: '',
         };
+        state.taxonomyAdded[idx] = { categories: new Set(), topics: new Set() };
       });
-      showReviewScreen();
+      showStep2();
     } catch (err) {
       showUploadError(err.message);
     }
@@ -86,6 +89,104 @@ function showUploadError(msg) {
   uploadError.textContent = msg;
   uploadError.style.display = 'block';
 }
+
+// ── Step 2: taxonomy upload ─────────────────────────────────────
+const uploadStep1      = document.getElementById('upload-step1');
+const uploadStep2      = document.getElementById('upload-step2');
+const step2FileInfo    = document.getElementById('step2-file-info');
+const taxonomyDropZone = document.getElementById('taxonomy-drop-zone');
+const taxonomyFileInput= document.getElementById('taxonomy-file-input');
+const taxonomyStatus   = document.getElementById('taxonomy-status');
+const taxonomyError    = document.getElementById('taxonomy-error');
+const btnNextReview    = document.getElementById('btn-next-review');
+
+function showStep2() {
+  uploadStep1.style.display = 'none';
+  uploadStep2.style.display = '';
+  step2FileInfo.textContent = `${state.rows.length} articles ready for review.`;
+}
+
+taxonomyFileInput.addEventListener('change', (e) => {
+  if (e.target.files[0]) handleTaxonomyFile(e.target.files[0]);
+});
+
+taxonomyDropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  taxonomyDropZone.classList.add('drag-over');
+});
+
+taxonomyDropZone.addEventListener('dragleave', () => taxonomyDropZone.classList.remove('drag-over'));
+
+taxonomyDropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  taxonomyDropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleTaxonomyFile(e.dataTransfer.files[0]);
+});
+
+function handleTaxonomyFile(file) {
+  taxonomyError.style.display = 'none';
+  taxonomyStatus.style.display = 'none';
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      if (!rows.length) throw new Error('Taxonomy file is empty.');
+      validateTaxonomyColumns(rows[0]);
+      state.taxonomy = buildTaxonomyHierarchy(rows);
+
+      const catCount = Object.keys(state.taxonomy).length;
+      const topicCount = Object.values(state.taxonomy).reduce((s, arr) => s + arr.length, 0);
+      taxonomyStatus.textContent = `✔ Taxonomy loaded: ${catCount} categories, ${topicCount} topics.`;
+      taxonomyStatus.style.display = 'block';
+    } catch (err) {
+      taxonomyError.textContent = err.message;
+      taxonomyError.style.display = 'block';
+      state.taxonomy = null;
+    }
+  };
+  reader.onerror = () => {
+    taxonomyError.textContent = 'Failed to read taxonomy file.';
+    taxonomyError.style.display = 'block';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function validateTaxonomyColumns(row) {
+  const cols = Object.keys(row).map(k => k.trim().toLowerCase());
+  if (!cols.includes('category')) throw new Error('Taxonomy file must have a "category" column.');
+  if (!cols.includes('topic'))    throw new Error('Taxonomy file must have a "topic" column.');
+}
+
+function buildTaxonomyHierarchy(rows) {
+  const hierarchy = {};
+  const seen = {};
+
+  rows.forEach(row => {
+    const cat   = String(getCol(row, 'category')).trim();
+    const topic = String(getCol(row, 'topic')).trim();
+    if (!cat) return;
+
+    const catKey = normalizeKey(cat);
+    if (!seen[catKey]) {
+      seen[catKey] = cat;
+      hierarchy[cat] = [];
+    }
+    const canonicalCat = seen[catKey];
+    if (topic && !hierarchy[canonicalCat].some(t => normalizeKey(t) === normalizeKey(topic))) {
+      hierarchy[canonicalCat].push(topic);
+    }
+  });
+
+  return hierarchy;
+}
+
+btnNextReview.addEventListener('click', () => {
+  showReviewScreen();
+});
 
 // ── Row parsing ──────────────────────────────────────────────────
 function splitField(val) {
@@ -209,19 +310,30 @@ function renderCard(row, idx) {
 function renderChipSection(card, field, items, idx) {
   const section  = card.querySelector(`.chip-section[data-field="${field}"]`);
   const chipsRow = section.querySelector('.chips-row');
+  chipsRow.innerHTML = '';
+  renderChipSectionContent(chipsRow, field, items, idx);
+}
 
-  if (!items.length) {
+function renderChipSectionContent(chipsRow, field, items, idx) {
+  if (!items.length && !(state.taxonomy && (field === 'categories' || field === 'topics'))) {
     chipsRow.innerHTML = '<span class="chip-empty">None</span>';
     return;
   }
 
-  items.forEach(({ item }) => {
+  items.forEach(({ item, fromTaxonomy }) => {
     const btn = document.createElement('button');
     btn.className = 'chip';
+    if (fromTaxonomy) btn.classList.add('chip-taxonomy');
     btn.textContent = item;
     btn.type = 'button';
+
+    // Restore selection state
+    const key = normalizeKey(item);
+    if (state.selections[idx][field].has(key)) {
+      btn.classList.add('selected');
+    }
+
     btn.addEventListener('click', () => {
-      const key = normalizeKey(item);
       const sel = state.selections[idx][field];
       if (sel.has(key)) {
         sel.delete(key);
@@ -236,6 +348,171 @@ function renderChipSection(card, field, items, idx) {
     });
     chipsRow.appendChild(btn);
   });
+
+  // "+ Add" button for categories/topics when taxonomy is loaded
+  if (state.taxonomy && (field === 'categories' || field === 'topics')) {
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-taxonomy-add';
+    addBtn.type = 'button';
+    addBtn.textContent = '+ Add';
+    addBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openTaxonomyDropdown(addBtn, field, idx);
+    });
+    chipsRow.appendChild(addBtn);
+  }
+}
+
+// ── Taxonomy dropdown ───────────────────────────────────────────
+let activeTaxDropdown = null;
+
+function closeTaxonomyDropdown() {
+  if (activeTaxDropdown) {
+    activeTaxDropdown.remove();
+    activeTaxDropdown = null;
+  }
+  document.removeEventListener('click', onDocClickCloseTax);
+}
+
+function onDocClickCloseTax(e) {
+  if (activeTaxDropdown && !activeTaxDropdown.contains(e.target)) {
+    closeTaxonomyDropdown();
+  }
+}
+
+function openTaxonomyDropdown(anchorBtn, field, idx) {
+  closeTaxonomyDropdown();
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'taxonomy-dropdown';
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'taxonomy-search';
+  searchInput.placeholder = field === 'categories'
+    ? 'Search categories...'
+    : 'Search topics or categories...';
+  dropdown.appendChild(searchInput);
+
+  const listEl = document.createElement('div');
+  listEl.className = 'taxonomy-list';
+  dropdown.appendChild(listEl);
+
+  function renderList(query) {
+    listEl.innerHTML = '';
+    const q = (query || '').trim().toLowerCase();
+
+    Object.entries(state.taxonomy).forEach(([cat, topics]) => {
+      const catMatch = !q || normalizeKey(cat).includes(q);
+      const matchingTopics = topics.filter(t => normalizeKey(t).includes(q));
+
+      if (!catMatch && matchingTopics.length === 0) return;
+
+      // Category row
+      const catRow = document.createElement('div');
+      catRow.className = 'taxonomy-item taxonomy-category';
+      catRow.textContent = cat;
+
+      const catKey = normalizeKey(cat);
+      const alreadyHasCat = state.rows[idx].categories
+        .some(c => normalizeKey(c.item) === catKey);
+      if (alreadyHasCat) catRow.classList.add('taxonomy-item-exists');
+
+      catRow.addEventListener('click', () => {
+        addTaxonomyCategory(idx, cat);
+        closeTaxonomyDropdown();
+      });
+      listEl.appendChild(catRow);
+
+      // Topic rows
+      const topicsToShow = catMatch ? topics : matchingTopics;
+      topicsToShow.forEach(topic => {
+        const topicRow = document.createElement('div');
+        topicRow.className = 'taxonomy-item taxonomy-topic';
+        topicRow.textContent = topic;
+
+        const topicKey = normalizeKey(topic);
+        const alreadyHasTopic = state.rows[idx].topics
+          .some(t => normalizeKey(t.item) === topicKey);
+        if (alreadyHasTopic) topicRow.classList.add('taxonomy-item-exists');
+
+        topicRow.addEventListener('click', () => {
+          addTaxonomyTopic(idx, topic, cat);
+          closeTaxonomyDropdown();
+        });
+        listEl.appendChild(topicRow);
+      });
+    });
+
+    if (!listEl.children.length) {
+      const empty = document.createElement('div');
+      empty.className = 'taxonomy-empty';
+      empty.textContent = 'No matches found.';
+      listEl.appendChild(empty);
+    }
+  }
+
+  renderList('');
+  searchInput.addEventListener('input', () => renderList(searchInput.value));
+
+  // Position in chip-section
+  const section = anchorBtn.closest('.chip-section');
+  section.style.position = 'relative';
+  section.appendChild(dropdown);
+
+  activeTaxDropdown = dropdown;
+  searchInput.focus();
+
+  setTimeout(() => {
+    document.addEventListener('click', onDocClickCloseTax);
+  }, 0);
+}
+
+// ── Taxonomy add helpers ────────────────────────────────────────
+function addTaxonomyCategory(idx, categoryName) {
+  const catKey = normalizeKey(categoryName);
+  const row = state.rows[idx];
+
+  const alreadyExists = row.categories.some(c => normalizeKey(c.item) === catKey);
+  if (!alreadyExists) {
+    row.categories.push({ item: categoryName, inV1: false, inV2: false, fromTaxonomy: true });
+    state.taxonomyAdded[idx].categories.add(catKey);
+  }
+
+  state.selections[idx].categories.add(catKey);
+  rerenderCardChips(idx);
+}
+
+function addTaxonomyTopic(idx, topicName, parentCategory) {
+  addTaxonomyCategory(idx, parentCategory);
+
+  const topicKey = normalizeKey(topicName);
+  const row = state.rows[idx];
+
+  const alreadyExists = row.topics.some(t => normalizeKey(t.item) === topicKey);
+  if (!alreadyExists) {
+    row.topics.push({ item: topicName, inV1: false, inV2: false, fromTaxonomy: true });
+    state.taxonomyAdded[idx].topics.add(topicKey);
+  }
+
+  state.selections[idx].topics.add(topicKey);
+  rerenderCardChips(idx);
+}
+
+function rerenderCardChips(idx) {
+  const card = document.querySelector(`.article-card[data-idx="${idx}"]`);
+  if (!card) return;
+
+  const row = state.rows[idx];
+  ['categories', 'topics', 'tags'].forEach(field => {
+    const section = card.querySelector(`.chip-section[data-field="${field}"]`);
+    const chipsRow = section.querySelector('.chips-row');
+    chipsRow.innerHTML = '';
+    renderChipSectionContent(chipsRow, field, row[field], idx);
+  });
+
+  autoMarkReviewed(idx, card);
+  updateProgress();
 }
 
 function autoMarkReviewed(idx, cardEl) {
@@ -333,10 +610,11 @@ document.getElementById('btn-download-report').addEventListener('click', () => {
 
 function buildReport() {
   // Per-article breakdown + totals
-  const detailHeaders = ['post_id', 'title', 'field', 'chosen_count', 'v1_only_chosen', 'v2_only_chosen', 'both_chosen', 'skipped'];
+  const detailHeaders = ['post_id', 'title', 'field', 'chosen_count', 'v1_only_chosen', 'v2_only_chosen', 'both_chosen', 'taxonomy_added_chosen', 'skipped'];
   const lines = [detailHeaders.map(csvEscape).join(',')];
 
-  let totalV1 = 0, totalV2 = 0, totalBoth = 0;
+  let totalV1 = 0, totalV2 = 0, totalBoth = 0, totalTaxAdded = 0;
+  let totalCatAdded = 0, totalTopicAdded = 0;
 
   state.rows.forEach((row, idx) => {
     const sel = state.selections[idx];
@@ -344,41 +622,48 @@ function buildReport() {
     ['categories', 'topics', 'tags'].forEach(field => {
       const items = row[field];
       const selectedSet = sel[field];
-      let v1Only = 0, v2Only = 0, both = 0, skipped = 0, chosen = 0;
+      let v1Only = 0, v2Only = 0, both = 0, taxAdded = 0, skipped = 0, chosen = 0;
 
-      items.forEach(({ item, inV1, inV2 }) => {
+      items.forEach(({ item, inV1, inV2, fromTaxonomy }) => {
         const isChosen = selectedSet.has(normalizeKey(item));
         if (isChosen) {
           chosen++;
-          if (inV1 && inV2) both++;
-          else if (inV1)    v1Only++;
-          else              v2Only++;
+          if (fromTaxonomy)       taxAdded++;
+          else if (inV1 && inV2)  both++;
+          else if (inV1)          v1Only++;
+          else                    v2Only++;
         } else {
           skipped++;
         }
       });
 
-      totalV1   += v1Only;
-      totalV2   += v2Only;
-      totalBoth += both;
+      totalV1       += v1Only;
+      totalV2       += v2Only;
+      totalBoth     += both;
+      totalTaxAdded += taxAdded;
+      if (field === 'categories') totalCatAdded += taxAdded;
+      if (field === 'topics')     totalTopicAdded += taxAdded;
 
-      lines.push([row.post_id, row.title, field, chosen, v1Only, v2Only, both, skipped].map(csvEscape).join(','));
+      lines.push([row.post_id, row.title, field, chosen, v1Only, v2Only, both, taxAdded, skipped].map(csvEscape).join(','));
     });
   });
 
   // Summary section
+  const pad = ['', '', '', '', '', '', '', '', ''];
   lines.push('');
-  lines.push(['SUMMARY', '', '', '', '', '', '', ''].map(csvEscape).join(','));
-  lines.push(['Metric', 'Value', '', '', '', '', '', ''].map(csvEscape).join(','));
-  lines.push(['V1-only items chosen', totalV1, '', '', '', '', '', ''].map(csvEscape).join(','));
-  lines.push(['V2-only items chosen', totalV2, '', '', '', '', '', ''].map(csvEscape).join(','));
-  lines.push(['Shared (both) items chosen', totalBoth, '', '', '', '', '', ''].map(csvEscape).join(','));
+  lines.push(['SUMMARY', ...pad.slice(1)].map(csvEscape).join(','));
+  lines.push(['Metric', 'Value', ...pad.slice(2)].map(csvEscape).join(','));
+  lines.push(['V1-only items chosen', totalV1, ...pad.slice(2)].map(csvEscape).join(','));
+  lines.push(['V2-only items chosen', totalV2, ...pad.slice(2)].map(csvEscape).join(','));
+  lines.push(['Shared (both) items chosen', totalBoth, ...pad.slice(2)].map(csvEscape).join(','));
+  lines.push(['Taxonomy categories added', totalCatAdded, ...pad.slice(2)].map(csvEscape).join(','));
+  lines.push(['Taxonomy topics added', totalTopicAdded, ...pad.slice(2)].map(csvEscape).join(','));
 
   const total = totalV1 + totalV2;
   const v1Pct = total ? ((totalV1 / total) * 100).toFixed(1) : '—';
   const v2Pct = total ? ((totalV2 / total) * 100).toFixed(1) : '—';
-  lines.push(['V1 preference score (%)', total ? v1Pct + '%' : '—', '', '', '', '', '', ''].map(csvEscape).join(','));
-  lines.push(['V2 preference score (%)', total ? v2Pct + '%' : '—', '', '', '', '', '', ''].map(csvEscape).join(','));
+  lines.push(['V1 preference score (%)', total ? v1Pct + '%' : '—', ...pad.slice(2)].map(csvEscape).join(','));
+  lines.push(['V2 preference score (%)', total ? v2Pct + '%' : '—', ...pad.slice(2)].map(csvEscape).join(','));
 
   let verdict = '—';
   if (total > 0) {
@@ -386,7 +671,7 @@ function buildReport() {
     else if (totalV2 > totalV1) verdict = 'Version 2 is preferred';
     else verdict = 'Tie — both versions equally preferred';
   }
-  lines.push(['Verdict', verdict, '', '', '', '', '', ''].map(csvEscape).join(','));
+  lines.push(['Verdict', verdict, ...pad.slice(2)].map(csvEscape).join(','));
 
   return lines.join('\r\n');
 }
@@ -404,10 +689,16 @@ document.getElementById('btn-restart').addEventListener('click', () => {
   reviewScreen.classList.remove('visible');
   progressBar.classList.remove('visible');
   uploadScreen.style.display = '';
+  uploadStep1.style.display = '';
+  uploadStep2.style.display = 'none';
   fileInput.value = '';
+  taxonomyFileInput.value = '';
   cardsContainer.innerHTML = '';
   uploadError.style.display = 'none';
-  Object.assign(state, { rawRows: [], rows: [], selections: {}, reviewed: new Set() });
+  taxonomyStatus.style.display = 'none';
+  taxonomyError.style.display = 'none';
+  closeTaxonomyDropdown();
+  Object.assign(state, { rawRows: [], rows: [], selections: {}, reviewed: new Set(), taxonomy: null, taxonomyAdded: {} });
 });
 
 // ── Utilities ─────────────────────────────────────────────────────

@@ -18,6 +18,12 @@
   --color-reviewed-border: #86efac;
   --color-unreview-bg: #fff7ed;
   --color-unreview-border: #fed7aa;
+  --color-chip-taxonomy-bg: #fef3c7;
+  --color-chip-taxonomy-border: #f59e0b;
+  --color-chip-taxonomy-text: #92400e;
+  --color-chip-taxonomy-sel-bg: #f59e0b;
+  --color-chip-taxonomy-sel-border: #d97706;
+  --color-chip-taxonomy-sel-text: #ffffff;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
@@ -196,6 +202,7 @@ body {
   margin-bottom: 20px;
   box-shadow: var(--shadow-card);
   transition: border-color 0.2s;
+  overflow: visible;
 }
 
 .article-card.reviewed {
@@ -500,6 +507,192 @@ body {
 .btn-restart:hover {
   color: var(--color-text);
   border-color: var(--color-text);
+}
+
+/* ── Step 2: taxonomy upload ─────────────────────────── */
+#upload-step2 h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.taxonomy-upload-section {
+  margin: 24px 0;
+  text-align: left;
+}
+
+.taxonomy-upload-section h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.taxonomy-upload-desc {
+  font-size: 13px !important;
+  margin-bottom: 14px !important;
+}
+
+.drop-zone-sm {
+  padding: 24px 20px;
+}
+
+.taxonomy-status-success {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--color-success);
+}
+
+.upload-error-box {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: #dc2626;
+}
+
+.btn-next {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 12px 28px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+
+.btn-next:hover {
+  background: var(--color-primary-dark);
+}
+
+/* ── Taxonomy chips ─────────────────────────────────── */
+.chip.chip-taxonomy {
+  background: var(--color-chip-taxonomy-bg);
+  border-color: var(--color-chip-taxonomy-border);
+  color: var(--color-chip-taxonomy-text);
+}
+
+.chip.chip-taxonomy:hover {
+  background: #fde68a;
+  border-color: #d97706;
+  color: #78350f;
+}
+
+.chip.chip-taxonomy.selected {
+  background: var(--color-chip-taxonomy-sel-bg);
+  border-color: var(--color-chip-taxonomy-sel-border);
+  color: var(--color-chip-taxonomy-sel-text);
+}
+
+.chip.chip-taxonomy.selected:hover {
+  background: #d97706;
+  border-color: #b45309;
+}
+
+/* ── + Add button ───────────────────────────────────── */
+.btn-taxonomy-add {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 99px;
+  border: 1.5px dashed var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  font-family: inherit;
+}
+
+.btn-taxonomy-add:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: #eff6ff;
+}
+
+/* ── Taxonomy dropdown ──────────────────────────────── */
+.taxonomy-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 200;
+  width: 320px;
+  max-height: 360px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.taxonomy-search {
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  background: var(--color-bg);
+}
+
+.taxonomy-search:focus {
+  background: #fff;
+}
+
+.taxonomy-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 4px 0;
+}
+
+.taxonomy-item {
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.taxonomy-item:hover {
+  background: #eff6ff;
+  color: var(--color-primary);
+}
+
+.taxonomy-category {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.taxonomy-topic {
+  padding-left: 28px;
+  color: var(--color-text-muted);
+}
+
+.taxonomy-item-exists {
+  opacity: 0.45;
+  text-decoration: line-through;
+  pointer-events: none;
+}
+
+.taxonomy-empty {
+  padding: 16px 14px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  text-align: center;
+  font-style: italic;
 }
 
 /* ── Responsive ──────────────────────────────────────── */
