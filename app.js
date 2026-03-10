@@ -408,8 +408,23 @@ function renderChipSectionContent(chipsRow, field, items, idx) {
     const btn = document.createElement('button');
     btn.className = 'chip';
     if (fromTaxonomy) btn.classList.add('chip-taxonomy');
-    btn.textContent = item;
     btn.type = 'button';
+
+    // Show "Category → Topic" when taxonomy is loaded
+    if (field === 'topics' && state.taxonomy) {
+      const parent = findParentCategory(item);
+      if (parent) {
+        const catSpan = document.createElement('span');
+        catSpan.className = 'chip-parent-cat';
+        catSpan.textContent = parent + ' → ';
+        btn.appendChild(catSpan);
+        btn.appendChild(document.createTextNode(item));
+      } else {
+        btn.textContent = item;
+      }
+    } else {
+      btn.textContent = item;
+    }
 
     // Restore selection state
     const key = normalizeKey(item);
@@ -422,6 +437,11 @@ function renderChipSectionContent(chipsRow, field, items, idx) {
       if (sel.has(key)) {
         sel.delete(key);
         btn.classList.remove('selected');
+        if (field === 'topics') {
+          maybeUnchooseParentCategory(idx, item);
+          rerenderCardChips(idx);
+          return;
+        }
       } else {
         sel.add(key);
         btn.classList.add('selected');
@@ -661,6 +681,28 @@ function addTagFromSet(idx, tagName) {
 
   state.selections[idx].tags.add(tagKey);
   rerenderCardChips(idx);
+}
+
+function findParentCategory(topicName) {
+  if (!state.taxonomy) return null;
+  const topicKey = normalizeKey(topicName);
+  for (const [cat, topics] of Object.entries(state.taxonomy)) {
+    if (topics.some(t => normalizeKey(t) === topicKey)) return cat;
+  }
+  return null;
+}
+
+function maybeUnchooseParentCategory(idx, topicName) {
+  const parentCat = findParentCategory(topicName);
+  if (!parentCat || !state.taxonomyAdded[idx] || !state.taxonomyAdded[idx].categories) return;
+  const catKey = normalizeKey(parentCat);
+  if (!state.taxonomyAdded[idx].categories.has(catKey)) return;
+  const sel = state.selections[idx].topics;
+  const siblings = state.taxonomy[parentCat] || [];
+  const anyStillChosen = siblings.some(t => sel.has(normalizeKey(t)));
+  if (!anyStillChosen) {
+    state.selections[idx].categories.delete(catKey);
+  }
 }
 
 function rerenderCardChips(idx) {
