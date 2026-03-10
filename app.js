@@ -353,6 +353,10 @@ function renderCard(row, idx) {
   renderChipSection(card, 'topics',     row.topics,     idx);
   renderChipSection(card, 'tags',       row.tags,       idx);
 
+  // Show the taxonomy hint only when taxonomy is loaded
+  const hint = card.querySelector('.chip-section-hint');
+  if (hint) hint.style.display = state.taxonomy ? '' : 'none';
+
   // Comment textarea
   const textarea = card.querySelector('.comment-textarea');
   textarea.addEventListener('input', () => {
@@ -389,7 +393,7 @@ function renderChipSection(card, field, items, idx) {
 }
 
 function hasAddSupport(field) {
-  if ((field === 'categories' || field === 'topics') && state.taxonomy) return true;
+  if (field === 'topics' && state.taxonomy) return true;
   if (field === 'tags' && state.tagSet) return true;
   return false;
 }
@@ -429,8 +433,8 @@ function renderChipSectionContent(chipsRow, field, items, idx) {
     chipsRow.appendChild(btn);
   });
 
-  // "+ Add" button for categories/topics when taxonomy is loaded
-  if (state.taxonomy && (field === 'categories' || field === 'topics')) {
+  // "+ Add" button for topics when taxonomy is loaded (topics auto-add parent category)
+  if (state.taxonomy && field === 'topics') {
     const addBtn = document.createElement('button');
     addBtn.className = 'btn-taxonomy-add';
     addBtn.type = 'button';
@@ -501,20 +505,10 @@ function openTaxonomyDropdown(anchorBtn, field, idx) {
 
       if (!catMatch && matchingTopics.length === 0) return;
 
-      // Category row
+      // Category header (non-clickable group label)
       const catRow = document.createElement('div');
-      catRow.className = 'taxonomy-item taxonomy-category';
+      catRow.className = 'taxonomy-category-header';
       catRow.textContent = cat;
-
-      const catKey = normalizeKey(cat);
-      const alreadyHasCat = state.rows[idx].categories
-        .some(c => normalizeKey(c.item) === catKey);
-      if (alreadyHasCat) catRow.classList.add('taxonomy-item-exists');
-
-      catRow.addEventListener('click', () => {
-        addTaxonomyCategory(idx, cat);
-        closeTaxonomyDropdown();
-      });
       listEl.appendChild(catRow);
 
       // Topic rows
