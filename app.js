@@ -421,7 +421,7 @@ function renderChipSectionContent(chipsRow, field, items, idx) {
       if (parent) {
         const catSpan = document.createElement('span');
         catSpan.className = 'chip-parent-cat';
-        catSpan.textContent = parent + ' → ';
+        catSpan.textContent = parent + ' > ';
         btn.appendChild(catSpan);
         btn.appendChild(document.createTextNode(item));
       } else {
