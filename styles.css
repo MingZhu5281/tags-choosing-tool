@@ -334,6 +334,63 @@ body {
   opacity: 0.7;
 }
 
+/* ── Card legend ─────────────────────────────────────── */
+.card-legend {
+  margin-top: 18px;
+  padding: 10px 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+}
+
+.legend-item-added {
+  display: none;
+}
+
+.legend-item-added.visible {
+  display: inline-flex;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.legend-demo {
+  display: inline-block;
+  width: 42px;
+  height: 20px;
+  border-radius: 99px;
+  flex-shrink: 0;
+}
+
+.legend-demo-proposed {
+  background: var(--color-chip-default-bg);
+  border: 1.5px solid var(--color-chip-default-border);
+}
+
+.legend-demo-chosen {
+  background: var(--color-chip-selected-bg);
+  border: 1.5px solid var(--color-chip-selected-border);
+}
+
+.legend-demo-added {
+  background: var(--color-chip-taxonomy-bg);
+  border: 1.5px solid var(--color-chip-taxonomy-border);
+}
+
+.legend-demo-added-chosen {
+  background: var(--color-chip-taxonomy-sel-bg);
+  border: 1.5px solid var(--color-chip-taxonomy-sel-border);
+}
+
 /* ── Comment + actions row ───────────────────────────── */
 .card-footer {
   margin-top: 16px;

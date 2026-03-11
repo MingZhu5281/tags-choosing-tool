@@ -357,6 +357,11 @@ function renderCard(row, idx) {
   const hint = card.querySelector('.chip-section-hint');
   if (hint) hint.style.display = state.taxonomy ? '' : 'none';
 
+  // Show the "Added from set" legend items only when taxonomy or tag set is loaded
+  if (state.taxonomy || state.tagSet) {
+    card.querySelectorAll('.legend-item-added').forEach(el => el.classList.add('visible'));
+  }
+
   // Comment textarea
   const textarea = card.querySelector('.comment-textarea');
   textarea.addEventListener('input', () => {
